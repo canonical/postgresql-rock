@@ -1,0 +1,90 @@
+name: postgres
+base: ubuntu@24.04
+version: '16.9'
+summary: PostgreSQL rock OCI
+description: |
+    PostgreSQL built from the official PostgreSQL Ubuntu apt package.
+    For more information on rocks, visit https://github.com/canonical/rockcraft.
+license: Apache-2.0
+platforms:
+    amd64:
+    arm64:
+
+environment:
+    TZ: UTC
+    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/16/bin"
+
+services:
+    postgres:
+        override: replace
+        command: sh -c "/usr/local/bin/entrypoint.sh postgres"
+        startup: enabled
+        user: postgres
+        group: postgres
+
+parts:
+    postgres:
+        plugin: nil
+        stage-packages:
+            - postgresql
+            - postgresql-16
+            - postgresql-common
+            - postgresql-client-16
+            - util-linux
+            # set PG pager for psql to less
+            - less
+            - locales-all
+            - coreutils
+            - gosu
+        organize:
+            usr/share/doc/postgresql/copyright: license/COPYRIGHT-postgresql
+            usr/share/doc/util-linux/copyright: license/COPYRIGHT-util-linux
+            usr/share/doc/less/copyright: license/COPYRIGHT-less
+            usr/share/doc/locales-all/copyright: license/COPYRIGHT-locales-all
+            usr/share/doc/coreutils/copyright: licenses/COPYRIGHT-coreutils
+    non-root-user:
+        plugin: nil
+        after:
+            - postgres
+        overlay-script: |
+            # Create a user in the $CRAFT_OVERLAY chroot
+            groupadd -R $CRAFT_OVERLAY -g 584788 postgres
+            useradd -R $CRAFT_OVERLAY --create-home -r -g postgres -u 584788 postgres
+        override-prime: |
+            craftctl default
+            install --directory --owner 584788 --group 584788 --mode 1777 /var/lib/postgresql
+            install --directory --owner 584788 --group 584788 --mode 3777 /var/run/postgresql
+            mkdir -p $CRAFT_PRIME/var/lib/postgresql
+            mkdir -p $CRAFT_PRIME/var/run/postgresql
+            chown -R 584788 $CRAFT_PRIME/var/lib/postgresql
+            chown -R 584788 $CRAFT_PRIME/var/run/postgresql
+            # Docker entrypoint compatibility
+            mkdir -p $CRAFT_PRIME/docker-entrypoint-initdb.d/
+            # Generate dpkg.query
+            mkdir -p $CRAFT_PRIME/usr/share/rocks
+            echo "# os-release" > $CRAFT_PRIME/usr/share/rocks/dpkg.query
+            echo "# dpkg-query" >> $CRAFT_PRIME/usr/share/rocks/dpkg.query
+            declare -a fields
+            fields+=('${db:Status-Abbrev}')
+            fields+=('${binary:Package}')
+            fields+=('${Version}')
+            fields+=('${source:Package}')
+            fields+=('${Source:Version}')
+            printf -v dpkg_ops '%s,' "${fields[@]}"
+            dpkg-query -W -f "${dpkg_ops}\n" >> $CRAFT_PRIME/usr/share/rocks/dpkg.query
+    rock-entrypoint:
+        plugin: dump
+        source: .
+        source-type: local
+        stage:
+            - usr/local/bin/
+        organize:
+            scripts/entrypoint.sh: /usr/local/bin/entrypoint.sh
+    rock-license:
+        plugin: dump
+        source: .
+        source-type: local
+        stage:
+            - licenses/LICENSE-rock
+        organize:
+            LICENSE: licenses/LICENSE-rock

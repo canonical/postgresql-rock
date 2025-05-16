@@ -1,0 +1,95 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: Release to GHCR
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - 16-24.04
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build rock
+    uses: canonical/data-platform-workflows/.github/workflows/build_rock.yaml@v32.2.0
+
+  release:
+    name: Release rock
+    needs:
+      - build
+    uses: canonical/data-platform-workflows/.github/workflows/release_rock.yaml@v32.2.0
+    with:
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+    permissions:
+      packages: write  # Needed to publish to GitHub Container Registry
+      contents: write  # Needed to create git tags
+
+  sbom:
+    name: Generate Software Bill of Materials
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install Syft
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Download rock package(s)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ needs.build.outputs.artifact-prefix }}-*
+          merge-multiple: true
+      - name: Generate SBOM(s)
+        shell: python
+        run: |
+          import pathlib
+          import subprocess
+
+          for rock_file in pathlib.Path(".").glob("*.rock"):
+              subprocess.run(
+                  ["syft", rock_file.name, "--output", f"spdx-json={rock_file.name}.spdx.json"],
+                  check=True,
+              )
+      - name: Upload SBOM(s)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ needs.build.outputs.artifact-prefix }}
+          path: '*.spdx.json'
+          if-no-files-found: error
+
+  oci-factory:
+    name: Update OCI-Factory
+    needs:
+      - release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Golang setup
+        uses: actions/setup-go@v5
+        with:
+          go-version: ">=1.22.0"
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install git
+          sudo apt install yq
+          go install github.com/canonical/oci-factory/tools/cli-client/cmd/oci-factory@latest
+      - name: Set binary paths to environment
+        run: |
+          echo OCI_FACTORY=$(go env GOPATH)/bin/oci-factory >> $GITHUB_ENV
+      - name: Set image version to environment
+        run: |
+          echo END_OF_LIFE=$(date -d "+ 5 years" "+%Y-%m-%d") >> $GITHUB_ENV
+          echo POSTGRESQL_MAJOR_VERSION=$(yq --raw-output '.version | split(".")[0]' rockcraft.yaml) >> $GITHUB_ENV
+          echo POSTGRESQL_MINOR_VERSION=$(yq --raw-output '.version | split(".")[1]' rockcraft.yaml) >> $GITHUB_ENV
+          echo OS_VERSION=$(yq --raw-output '.base | split("@")[1]' rockcraft.yaml) >> $GITHUB_ENV
+      - name: Release
+        run: |
+          $OCI_FACTORY upload -y --release \
+            track=${POSTGRESQL_MAJOR_VERSION}.${POSTGRESQL_MINOR_VERSION}-${OS_VERSION},eol=${END_OF_LIFE},risks=edge
+        env:
+          GITHUB_TOKEN: ${{ secrets.DP_BOT_PAT }}
