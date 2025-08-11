@@ -11,16 +11,15 @@ If you are using another version of Ubuntu or another operating system, the proc
 
 ### Clone Repository
 ```bash
-git clone git@github.com:canonical/postgresql-rock.git
+git clone https://github.com/canonical/postgresql-rock.git
 cd postgresql-rock
 ```
 
 ### Installing Prerequisites
 ```bash
-sudo snap install rockcraft --edge
+sudo snap install rockcraft --classic --edge
 sudo snap install docker
 sudo snap install lxd
-sudo snap install skopeo --edge --devmode
 ```
 
 ### Configuring Prerequisites
@@ -29,13 +28,40 @@ sudo usermod -aG docker $USER
 sudo lxd init --auto
 ```
 
-*_NOTE:_* You will need to open a new shell for the group change to take effect (i.e. `su - $USER`)
-
 ### Packing and Running the rock
 ```bash
+VERSION=$(awk '/^version: /{print $2;exit}' rockcraft.yaml)
 rockcraft pack
-sudo skopeo --insecure-policy copy oci-archive:postgresql*.rock docker-daemon:<username>/postgresql:<tag>
-docker run --rm -it <username>/postgresql-server:<tag>
+sudo rockcraft.skopeo --insecure-policy copy oci-archive:postgres_${VERSION}_amd64.rock docker-daemon:${USER}/postgres:${VERSION}
+docker run --rm -it -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name mypostgres ${USER}/postgres:${VERSION}
+```
+
+### Connecting to PostgreSQL
+From inside the container:
+```bash
+docker exec -it -e PGPASSWORD=myS3cr3tp@ss mypostgres psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+```
+
+From outside the container:
+```bash
+PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres
+```
+
+Troubleshooting:
+```bash
+docker exec -it mypostgres pebble logs
+docker exec -it mypostgres pebble services
+docker exec -it mypostgres pebble restart postgres
+```
+
+### Testing rock
+Using [Spread](https://github.com/canonical/spread):
+```bash
+rockcraft test                       # run all tests
+ls -la spread/tests/                 # list all tests
+rockcraft test -- spread/tests/smoke # run one test suite
+rockcraft test --debug               # to open shell for failed test
+rockcraft test --shell-after         # to open shell after each step
 ```
 
 ## License

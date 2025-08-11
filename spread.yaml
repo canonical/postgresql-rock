@@ -1,0 +1,38 @@
+project: postgres-rock
+
+backends:
+  craft:
+    type: craft
+    systems:
+      - ubuntu-24.04
+
+suites:
+  spread/tests/:
+    summary: General integration tests
+
+    prepare: |
+      # For 'rockcraft.skopeo'
+      snap install rockcraft --classic --edge
+      snap install docker
+
+      # Wait for docker daemon to come online
+      apt install -y retry
+      retry --times=10 --delay 2 -- docker run hello-world
+
+      # Load the rock into docker
+      rockcraft.skopeo --insecure-policy copy "oci-archive:$CRAFT_ARTIFACT" docker-daemon:postgres:spreadtest
+
+      # Install postgresql client (psql)
+      apt install -y postgresql-common postgresql-client-16
+    prepare-each: |
+      docker run -d --rm -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name spreadlocaltest postgres:spreadtest
+      sleep 3 # Wait for pebble to bootstrap and launch Postgres
+    restore-each: |
+      docker kill spreadlocaltest || true
+    restore: |
+      docker image rm --force postgres:spreadtest
+
+exclude:
+  - .git
+
+kill-timeout: 1h
