@@ -33,7 +33,7 @@ sudo lxd init --auto
 VERSION=$(awk '/^version: /{print $2;exit}' rockcraft.yaml)
 rockcraft pack
 sudo rockcraft.skopeo --insecure-policy copy oci-archive:postgres_${VERSION}_amd64.rock docker-daemon:${USER}/postgres:${VERSION}
-docker run --rm -it -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name mypostgres ${USER}/postgres:${VERSION}
+docker run --rm -it -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name mypostgres --volume pg-data:/var/lib/postgresql/ -d ${USER}/postgres:${VERSION}
 ```
 
 ### Connecting to PostgreSQL
