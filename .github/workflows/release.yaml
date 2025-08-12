@@ -83,10 +83,12 @@ jobs:
           echo OCI_FACTORY="$(go env GOPATH)/bin/oci-factory" >> "${GITHUB_ENV}"
       - name: Set image version to environment
         run: |
-          echo END_OF_LIFE=$(date -d "+ 5 years" "+%Y-%m-%d") >> "${GITHUB_ENV}"
-          echo POSTGRESQL_MAJOR_VERSION=$(yq --raw-output '.version | split(".")[0]' rockcraft.yaml) >> "${GITHUB_ENV}"
-          echo POSTGRESQL_MINOR_VERSION=$(yq --raw-output '.version | split(".")[1]' rockcraft.yaml) >> "${GITHUB_ENV}"
-          echo OS_VERSION=$(yq --raw-output '.base | split("@")[1]' rockcraft.yaml) >> "${GITHUB_ENV}"
+          {
+            echo END_OF_LIFE=$(date -d "+ 5 years" "+%Y-%m-%d")
+            echo POSTGRESQL_MAJOR_VERSION=$(yq --raw-output '.version | split(".")[0]' rockcraft.yaml)
+            echo POSTGRESQL_MINOR_VERSION=$(yq --raw-output '.version | split(".")[1]' rockcraft.yaml)
+            echo OS_VERSION=$(yq --raw-output '.base | split("@")[1]' rockcraft.yaml)
+          } >> "${GITHUB_ENV}"
       - name: Release
         run: |
           "${OCI_FACTORY}" upload -y --release \
