@@ -44,6 +44,7 @@ docker exec -it -e PGPASSWORD=myS3cr3tp@ss mypostgres psql -h 127.0.0.1 -p 5432 
 
 From outside the container:
 ```bash
+sudo apt install -y postgresql-client-*
 PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres
 ```
 

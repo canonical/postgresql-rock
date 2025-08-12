@@ -23,10 +23,10 @@ suites:
       rockcraft.skopeo --insecure-policy copy "oci-archive:$CRAFT_ARTIFACT" docker-daemon:postgres:spreadtest
 
       # Install postgresql client (psql)
-      apt install -y postgresql-common postgresql-client-16
+      apt install -y postgresql-client-*
     prepare-each: |
       docker run -d --rm -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name spreadlocaltest postgres:spreadtest
-      sleep 3 # Wait for pebble to bootstrap and launch Postgres
+      sleep 5 # Wait for pebble to bootstrap and launch Postgres
     restore-each: |
       docker kill spreadlocaltest || true
     restore: |
