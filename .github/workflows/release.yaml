@@ -84,10 +84,10 @@ jobs:
       - name: Set image version to environment
         run: |
           {
-            echo END_OF_LIFE=$(date -d "+ 5 years" "+%Y-%m-%d")
-            echo POSTGRESQL_MAJOR_VERSION=$(yq --raw-output '.version | split(".")[0]' rockcraft.yaml)
-            echo POSTGRESQL_MINOR_VERSION=$(yq --raw-output '.version | split(".")[1]' rockcraft.yaml)
-            echo OS_VERSION=$(yq --raw-output '.base | split("@")[1]' rockcraft.yaml)
+            echo END_OF_LIFE="$(date -d "+ 5 years" "+%Y-%m-%d")"
+            echo POSTGRESQL_MAJOR_VERSION="$(yq --raw-output '.version | split(".")[0]' rockcraft.yaml)"
+            echo POSTGRESQL_MINOR_VERSION="$(yq --raw-output '.version | split(".")[1]' rockcraft.yaml)"
+            echo OS_VERSION="$(yq --raw-output '.base | split("@")[1]' rockcraft.yaml)"
           } >> "${GITHUB_ENV}"
       - name: Release
         run: |
