@@ -1,6 +1,6 @@
 name: postgres
 base: ubuntu@24.04
-version: '16.9'
+version: 16.9
 summary: PostgreSQL rock OCI
 description: |
     PostgreSQL built from the official PostgreSQL Ubuntu apt package.
@@ -11,8 +11,9 @@ platforms:
     arm64:
 
 environment:
-    TZ: UTC
     PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/16/bin"
+    PGDATA: /var/lib/postgresql/data
+    TZ: UTC
 
 services:
     postgres:
@@ -60,6 +61,8 @@ parts:
             chown -R 584788 $CRAFT_PRIME/var/run/postgresql
             # Docker entrypoint compatibility
             mkdir -p $CRAFT_PRIME/docker-entrypoint-initdb.d/
+            # Allow access to PostgreSQL
+            sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" $CRAFT_PRIME/usr/share/postgresql/16/postgresql.conf.sample
             # Generate dpkg.query
             mkdir -p $CRAFT_PRIME/usr/share/rocks
             echo "# os-release" > $CRAFT_PRIME/usr/share/rocks/dpkg.query

@@ -1,6 +1,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-name: Tests
+name: Rock Build/Tests
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,16 +12,47 @@ on:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install tox
-        run: pipx install tox
-      - name: Run linters
-        run: tox run -e lint
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v32.2.2
 
   build:
     name: Build rock
-    uses: canonical/data-platform-workflows/.github/workflows/build_rock.yaml@v32.2.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_rock.yaml@v32.2.2
+
+  test:
+    name: Test rock | ${{ matrix.base.version }} ${{ matrix.platform.arch }}
+    timeout-minutes: 10
+    # runs-on: [self-hosted, linux, "${{ matrix.platform.host_arch }}", "${{ matrix.base.codename }}", large]
+    runs-on: "ubuntu-${{ matrix.base.version }}${{ matrix.platform.gh_suffix }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        base:
+          - { codename: noble, version: 24.04 }
+        platform:
+          - { os: linux, arch: amd64, host_arch: x64, gh_suffix: "" }
+          - { os: linux, arch: arm64, host_arch: arm64, gh_suffix: "-arm" }
+    needs:
+      - lint
+      - build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download rock package(s)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ needs.build.outputs.artifact-prefix }}-*-${{ matrix.platform.arch }}
+          merge-multiple: true
+      - name: Run tests
+        run: |
+          # lxd is necessary for spread
+          sudo snap install lxd
+          sudo adduser "$USER" lxd
+          # `newgrp` does not work in GitHub Actions; use `sudo --user` instead
+          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- lxd waitready
+          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- lxd init --auto
+          # Workaround for Docker & LXD on same machine
+          sudo iptables -F FORWARD
+          sudo iptables -P FORWARD ACCEPT
+
+          sudo snap install rockcraft --classic --edge
+          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- rockcraft test
