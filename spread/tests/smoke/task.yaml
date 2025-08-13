@@ -10,15 +10,15 @@ execute: |
   PGPASSWORD=wrongpassord psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();" && exit 1 || true # failure expected
 
   echo "Checking Pebble UI..."
-  docker exec -t spreadlocaltest pebble stop postgres
+  docker exec -t "${SPREAD_TASK//\//_}" pebble stop postgres
   PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();" && exit 1 || true # failure expected
 
-  docker exec -t spreadlocaltest pebble start postgres
+  docker exec -t "${SPREAD_TASK//\//_}" pebble start postgres
   PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();"
 
-  docker exec -t spreadlocaltest pebble restart postgres
+  docker exec -t "${SPREAD_TASK//\//_}" pebble restart postgres
   PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();"
 
-  docker exec -t spreadlocaltest pebble logs
-  docker exec -t spreadlocaltest pebble services
+  docker exec -t "${SPREAD_TASK//\//_}" pebble logs
+  docker exec -t "${SPREAD_TASK//\//_}" pebble services
 

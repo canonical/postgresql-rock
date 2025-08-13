@@ -25,10 +25,10 @@ suites:
       # Install postgresql client (psql)
       apt install -y postgresql-client-*
     prepare-each: |
-      docker run -d --rm -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name spreadlocaltest postgres:spreadtest
+      docker run -d --rm -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name "${SPREAD_TASK//\//_}" postgres:spreadtest
       sleep 5 # Wait for pebble to bootstrap and launch Postgres
     restore-each: |
-      docker kill spreadlocaltest || true
+      docker kill "${SPREAD_TASK//\//_}" || true
     restore: |
       docker image rm --force postgres:spreadtest
 
