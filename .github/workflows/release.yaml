@@ -38,7 +38,7 @@ jobs:
       - name: Install Syft
         run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
       - name: Download rock package(s)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: ${{ needs.build.outputs.artifact-prefix }}-*
           merge-multiple: true
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Golang setup
         uses: actions/setup-go@v5
         with:
