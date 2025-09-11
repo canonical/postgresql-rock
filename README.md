@@ -30,7 +30,7 @@ sudo lxd init --auto
 
 ### Packing and Running the rock
 ```bash
-VERSION=$(awk '/^version: /{print $2;exit}' rockcraft.yaml)
+VERSION=$(awk '/^version: /{gsub(/'"'"'/, "", $2); print $2;exit}' rockcraft.yaml)
 rockcraft pack
 sudo rockcraft.skopeo --insecure-policy copy oci-archive:postgres_${VERSION}_amd64.rock docker-daemon:${USER}/postgres:${VERSION}
 docker run --rm -it -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name mypostgres --volume pg-data:/var/lib/postgresql/ -d ${USER}/postgres:${VERSION}
