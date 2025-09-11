@@ -3,6 +3,6 @@ summary: PostgreSQL rock smoke tests
 execute: |
   echo "Running versions test..."
 
-  ROCK_VERSION="$(awk '/^version: /{print $2;exit}' "${SPREAD_PATH}"/rockcraft.yaml)"
+  ROCK_VERSION="$(awk '/^version: /{gsub(/'"'"'/, "", $2); print $2;exit}' "${SPREAD_PATH}"/rockcraft.yaml)"
   PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select version();" | MATCH "PostgreSQL ${ROCK_VERSION}"
 
