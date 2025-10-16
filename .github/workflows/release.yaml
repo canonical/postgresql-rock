@@ -86,12 +86,11 @@ jobs:
           {
             echo END_OF_LIFE="$(date -d "+ 5 years" "+%Y-%m-%d")"
             echo POSTGRESQL_MAJOR_VERSION="$(yq '(.version | tostring) | split(".")[0]' rockcraft.yaml)"
-            echo POSTGRESQL_MINOR_VERSION="$(yq '(.version | tostring) | split(".")[1]' rockcraft.yaml)"
             echo OS_VERSION="$(yq '.base | split("@")[1]' rockcraft.yaml)"
           } >> "${GITHUB_ENV}"
       - name: Release
         run: |
           "${OCI_FACTORY}" upload -y --release \
-            track="${POSTGRESQL_MAJOR_VERSION}.${POSTGRESQL_MINOR_VERSION}-${OS_VERSION},eol=${END_OF_LIFE},risks=edge"
+            track="${POSTGRESQL_MAJOR_VERSION}-${OS_VERSION},eol=${END_OF_LIFE},risks=edge"
         env:
           GITHUB_TOKEN: ${{ secrets.DP_BOT_PAT }}
