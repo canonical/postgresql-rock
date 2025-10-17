@@ -24,6 +24,13 @@ services:
         group: postgres
 
 parts:
+    apt:
+      plugin: nil
+      override-build: |
+        apt update
+        apt -y upgrade
+        apt -y dist-upgrade
+        craftctl default
     postgres:
         plugin: nil
         stage-packages:
