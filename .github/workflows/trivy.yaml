@@ -37,12 +37,12 @@ jobs:
         run: |
           full_version="$(yq .version rockcraft.yaml)"
           sudo rockcraft.skopeo --insecure-policy copy \
-              "oci-archive:postgresql_${full_version}_amd64.rock" \
-              "docker-daemon:trivy/postgresql:test"
+              "oci-archive:postgres_${full_version}_amd64.rock" \
+              "docker-daemon:trivy/postgres:test"
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          image-ref: "trivy/postgresql:test"
+          image-ref: "trivy/postgres:test"
           format: "sarif"
           output: "trivy-results.sarif"
           severity: "HIGH,CRITICAL"
