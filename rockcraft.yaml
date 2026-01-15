@@ -1,7 +1,7 @@
 name: postgresql
 base: bare
 build-base: devel
-version: '18.1'
+version: '19devel'
 summary: PostgreSQL rock OCI
 description: |
     PostgreSQL built from the official PostgreSQL Ubuntu apt package.
@@ -12,7 +12,7 @@ platforms:
     arm64:
 
 environment:
-    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/18/bin"
+    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/19/bin"
     PGDATA: /var/lib/postgresql/data
     TZ: UTC
 
@@ -43,7 +43,7 @@ parts:
         after:
             - pre-postgres
         source: bld:postgresql
-        source-channel: 18-26.04/edge
+        source-channel: 19-26.04/edge
         stage-packages:
             - libicu78
             - libldap2
@@ -101,7 +101,7 @@ parts:
         override-prime: |
             craftctl default
             # Allow access to PostgreSQL
-            sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" $CRAFT_PRIME/usr/share/postgresql/18/postgresql.conf.sample
+            sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" $CRAFT_PRIME/usr/share/postgresql/19/postgresql.conf.sample
     rock-entrypoint:
         plugin: dump
         source: .
