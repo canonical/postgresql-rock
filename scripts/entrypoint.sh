@@ -311,10 +311,6 @@ _main() {
 		docker_setup_env
 		# setup data directories and permissions (when run as root)
 		docker_create_db_directories
-		if [ "$(id -u)" = '0' ]; then
-			# then restart script as postgres user
-			exec gosu postgres "$BASH_SOURCE" "$@"
-		fi
 
 		# only run initialization on an empty data directory
 		if [ -z "$DATABASE_ALREADY_EXISTS" ]; then
