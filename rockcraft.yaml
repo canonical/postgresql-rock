@@ -37,7 +37,6 @@ parts:
             - pre-postgres
         overlay-packages:
             - coreutils
-            - gosu
             # set PG pager for psql to less
             - less
             - locales-all
@@ -52,7 +51,6 @@ parts:
             craftctl default
             mkdir -p $CRAFT_OVERLAY/licenses
             mv $CRAFT_OVERLAY/usr/share/doc/coreutils/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-coreutils
-            mv $CRAFT_OVERLAY/usr/share/doc/gosu/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-gosu
             mv $CRAFT_OVERLAY/usr/share/doc/less/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-less
             mv $CRAFT_OVERLAY/usr/share/doc/locales-all/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-locales-all
             mv $CRAFT_OVERLAY/usr/share/doc/postgresql/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-postgresql
