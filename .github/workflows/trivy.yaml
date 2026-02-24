@@ -41,7 +41,7 @@ jobs:
               "oci-archive:postgres_${full_version}_amd64.rock" \
               "docker-daemon:trivy/postgres:test"
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.34.0
+        uses: aquasecurity/trivy-action@0.34.1
         with:
           image-ref: "trivy/postgres:test"
           format: "sarif"
