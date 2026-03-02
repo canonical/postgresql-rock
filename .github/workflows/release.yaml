@@ -88,8 +88,8 @@ jobs:
         run: |
           {
             echo END_OF_LIFE="$(date -d "+ 5 years" "+%Y-%m-%d")"
-            echo POSTGRESQL_MAJOR_VERSION="$(yq '(.version | tostring) | split(".")[0]' rockcraft.yaml)"
-            echo OS_VERSION="$(yq '.base | split("@")[1]' rockcraft.yaml)"
+            echo POSTGRESQL_MAJOR_VERSION="$(yq -r '(.version | tostring) | split(".")[0]' rockcraft.yaml)"
+            echo OS_VERSION="$(yq -r '.base | split("@")[1]' rockcraft.yaml)"
           } >> "${GITHUB_ENV}"
       - name: Release
         run: |
