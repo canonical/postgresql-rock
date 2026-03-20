@@ -8,6 +8,7 @@ on:
       - '*-*.04'
     paths:
       - rockcraft.yaml
+      - 'scripts/**'
   workflow_dispatch:
 
 jobs:
