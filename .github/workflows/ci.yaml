@@ -60,6 +60,7 @@ jobs:
           - { os: linux, arch: amd64, host_arch: x64, gh_suffix: "" }
           - { os: linux, arch: arm64, host_arch: arm64, gh_suffix: "-arm" }
     needs:
+      - lint-workflows
       - lint
       - build
     steps:
