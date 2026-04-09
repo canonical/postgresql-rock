@@ -19,7 +19,7 @@ environment:
 services:
     postgres:
         override: replace
-        command: sh -c "/usr/local/bin/entrypoint.sh postgres"
+        command: /usr/local/bin/entrypoint.sh postgres
         startup: enabled
         user: postgres
         group: postgres
