@@ -5,6 +5,108 @@ This repository contains the packaging metadata for creating a rock of PostgreSQ
 the official ubuntu PostgreSQL package from the Ubuntu repository.
 For more information on rocks, visit the [rockcraft repository][repo-rockcraft].
 
+## Using Rock
+
+As simple as pull, run, connect. Pull:
+```bash
+docker pull ubuntu/postgres:16-24.04_edge
+```
+
+Start a new container:
+```bash
+docker run -it -d \
+    -e POSTGRES_PASSWORD=myS3cr3tp@ss \
+    --name mypostgres \
+    -p 3432:5432 \
+    --volume pg-data:/var/lib/postgresql/ \
+    ubuntu/postgres:16-24.04_edge
+```
+
+Connect using psql from the container:
+```bash
+docker exec -it \
+    -e PGPASSWORD=myS3cr3tp@ss \
+    mypostgres psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+
+> psql (16.13 (Ubuntu 16.13-0ubuntu0.24.04.1))
+> Type "help" for help.
+>
+> postgres=#
+```
+
+Connect using local psql (if available):
+```bash
+sudo apt install -y postgresql-client-*
+PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres
+
+> psql (16.13 (Ubuntu 16.13-0ubuntu0.24.04.1))
+> Type "help" for help.
+>
+> postgres=#
+```
+
+### (Re)start/stop rock
+
+To stop/start running rock, use common actions:
+```bash
+docker ps
+
+> CONTAINER ID   IMAGE                           COMMAND                  CREATED         STATUS          PORTS                                         NAMES
+> f935801018a2   ubuntu/postgres:16-24.04_edge   "/usr/bin/pebble ent…"   4 minutes ago   Up 40 seconds   0.0.0.0:3432->5432/tcp, [::]:3432->5432/tcp   mypostgres
+
+docker stop mypostgres
+
+docker start mypostgres
+
+docker exec -it -e PGPASSWORD=myS3cr3tp@ss mypostgres psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+
+> psql (16.13 (Ubuntu 16.13-0ubuntu0.24.04.1))
+> Type "help" for help.
+>
+> postgres=#
+```
+
+### Delete running rock
+
+To delete the running rock (note: ensure data stored in persistent volume!):
+```bash
+docker ps --format "table {{.Names}}\t{{.Mounts}}"
+> NAMES        MOUNTS
+> some_pg                <<< DB stored inside container (will be removed with container)
+> mypostgres   pg-data   <<< DB stored on percistent volume (survives container removal)
+
+docker volume inspect pg-data
+
+docker stop mypostgres
+docker rm mypostgres
+```
+
+### PostgreSQL configuration
+Start PostgreSQL with non-default configurations (during the initial docker run):
+```bash
+docker run -it -d \
+    -e POSTGRES_PASSWORD=myS3cr3tp@ss \
+    -p 3432:5432 \
+    --name mypostgres \
+    --volume pg-data:/var/lib/postgresql/ \
+    ubuntu/postgres:16-24.04_edge \
+        --args postgres \
+            -c max_connections=242 \
+            -c fsync=off \
+            -c full_page_writes=off \
+            -c shared_buffers=256MB
+
+
+docker exec -it -e PGPASSWORD=myS3cr3tp@ss mypostgres \
+    psql -h 127.0.0.1 -p 5432 -U postgres -d postgres \
+        -c 'show max_connections;'
+
+ max_connections
+-----------------
+ 242
+(1 row)
+```
+
 ## Building the rock
 The steps outlined below are based on the assumption that you are building the rock with the latest LTS of Ubuntu.
 If you are using another version of Ubuntu or another operating system, the process may be different.
