@@ -119,7 +119,7 @@ cd postgresql-rock
 
 ### Installing Prerequisites
 ```bash
-sudo snap install rockcraft --classic --edge
+sudo snap install rockcraft --classic
 sudo snap install docker
 sudo snap install lxd
 ```
@@ -130,10 +130,14 @@ sudo usermod -aG docker $USER
 sudo lxd init --auto
 ```
 
-### Packing and Running the rock
+### Packing the rock
+```bash
+rockcraft pack
+```
+
+### Running the rock
 ```bash
 VERSION=$(awk '/^version: /{gsub(/'"'"'/, "", $2); print $2;exit}' rockcraft.yaml)
-rockcraft pack
 sudo rockcraft.skopeo --insecure-policy copy oci-archive:postgres_${VERSION}_amd64.rock docker-daemon:${USER}/postgres:${VERSION}
 docker run --rm -it -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name mypostgres --volume pg-data:/var/lib/postgresql/ -d ${USER}/postgres:${VERSION}
 ```
@@ -150,14 +154,14 @@ sudo apt install -y postgresql-client-*
 PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres
 ```
 
-Troubleshooting:
+## Troubleshooting:
 ```bash
 docker exec -it mypostgres pebble logs
 docker exec -it mypostgres pebble services
 docker exec -it mypostgres pebble restart postgres
 ```
 
-### Testing rock
+## Testing rock
 Using [Spread](https://github.com/canonical/spread):
 ```bash
 rockcraft test                       # run all tests
