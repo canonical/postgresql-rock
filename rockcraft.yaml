@@ -70,6 +70,15 @@ parts:
             usr/share/doc/locales-all/copyright: license/COPYRIGHT-locales-all
             usr/share/doc/tzdata/copyright: license/COPYRIGHT-tzdata
             usr/share/doc/util-linux/copyright: license/COPYRIGHT-util-linux
+    pg-similarity:
+        plugin: dump
+        after:
+            - pre-postgres
+        source: bld:postgresql-similarity
+        source-channel: 1-pg18-26.04/edge
+        stage:
+            - usr/share/
+            - usr/lib/
     post-postgres:
         plugin: nil
         after:
