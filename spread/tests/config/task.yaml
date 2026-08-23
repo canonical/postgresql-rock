@@ -1,0 +1,21 @@
+summary: PostgreSQL rock config tests
+
+execute: |
+  echo "Running smoke test..."
+
+  echo "Checking default max_connections..."
+  PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c 'show max_connections;' | grep 100
+  PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c 'show shared_buffers;' | grep 128MB
+
+  echo "Stop/clean the container with default PG config..."
+  docker stop --timeout 0 "${SPREAD_TASK//\//_}"
+  docker rm "${SPREAD_TASK//\//_}" || true
+
+  echo "Staring container with non-default config..."
+  docker run -d --rm -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name "${SPREAD_TASK//\//_}" postgres:spreadtest \
+    -c max_connections=242 -c fsync=off -c full_page_writes=off -c shared_buffers=256MB
+  sleep 5
+
+  echo "Checking non-default max_connections..."
+  PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c 'show max_connections;' | grep 242
+  PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c 'show shared_buffers;' | grep 256MB
