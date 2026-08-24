@@ -90,11 +90,10 @@ docker run -it -d \
     --name mypostgres \
     --volume pg-data:/var/lib/postgresql/ \
     ubuntu/postgres:16-24.04_edge \
-        --args postgres \
-            -c max_connections=242 \
-            -c fsync=off \
-            -c full_page_writes=off \
-            -c shared_buffers=256MB
+        -c max_connections=242 \
+        -c fsync=off \
+        -c full_page_writes=off \
+        -c shared_buffers=256MB
 
 
 docker exec -it -e PGPASSWORD=myS3cr3tp@ss mypostgres \
