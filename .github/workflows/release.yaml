@@ -17,6 +17,7 @@ jobs:
     uses: $/.github/workflows/ci.yaml
     permissions:
       contents: read
+    cache-mode: none
 
   release:
     name: Release rock
@@ -28,6 +29,7 @@ jobs:
     permissions:
       packages: write  # Needed to publish to GitHub Container Registry
       contents: write  # Needed to create git tags
+    cache-mode: none
 
   oci-factory:
     name: Update OCI-Factory
@@ -70,6 +72,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.DP_BOT_PAT_OCI_FACTORY }}
     permissions: {}
+    cache-mode: none
 
   sbom:
     name: Generate Software Bill of Materials
@@ -109,6 +112,7 @@ jobs:
           path: '*.spdx.json'
           if-no-files-found: error
     permissions: {}
+    cache-mode: none
 
   trivy:
     needs:
@@ -118,3 +122,4 @@ jobs:
     uses: $/.github/workflows/trivy.yaml
     permissions:
       security-events: write  # Required for uploading Trivy SARIF results
+    cache-mode: none

@@ -21,6 +21,7 @@ jobs:
     uses: canonical/data-platform-workflows/.github/workflows/lint_workflows.yaml@v53.0.0
     permissions:
       contents: read
+    cache-mode: none
 
   lint:
     name: Lint
@@ -38,12 +39,14 @@ jobs:
       - name: tox run -e lint
         run: tox run -e lint
     permissions: {}
+    cache-mode: none
 
   build:
     name: Build rock
     uses: canonical/data-platform-workflows/.github/workflows/build_rock.yaml@v53.0.0
     permissions:
       contents: read
+    cache-mode: none
 
   test:
     name: Test rock | ${{ matrix.base.version }} ${{ matrix.platform.arch }}
@@ -87,3 +90,4 @@ jobs:
           sudo snap install rockcraft --classic --edge
           sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- rockcraft test
     permissions: {}
+    cache-mode: none
