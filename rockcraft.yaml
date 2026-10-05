@@ -1,107 +1,305 @@
-name: postgres
-base: ubuntu@24.04
-version: '16.15'
-summary: PostgreSQL rock OCI
+name: postgres  # TODO switch to postgresql
+# Do not specify `license` since this rock contains software with several different licenses.
+# rockcraft.yaml `license` populates `org.opencontainers.image.licenses`, which is described as:
+# > License(s) under which contained software is distributed as an SPDX License Expression.
+# https://specs.opencontainers.org/image-spec/annotations/#pre-defined-annotation-keys
+# (That definition implies that all software contained in the OCI image is included in the license
+# expression.)
+title: PostgreSQL
+summary: Extensible and stable database
 description: |
-    PostgreSQL built from the official PostgreSQL Ubuntu apt package.
-    For more information on rocks, visit https://github.com/canonical/rockcraft.
-license: Apache-2.0
+  PostgreSQL is a powerful, open source object-relational database system that uses and extends the SQL language combined with many features that safely store and scale the most complicated data workloads.
+
+  PostgreSQL has a rich ecosystem of extensions.
+
+  Within a major version, PostgreSQL provides excellent forward and backward compatibility.
+
+  Development of PostgreSQL is directed and driven by its community.
+source-code: https://github.com/canonical/postgresql-rock
+contact: https://matrix.to/#/#charmhub-data-platform:ubuntu.com
+issues: https://github.com/canonical/postgresql-rock/issues
+
+base: bare
+build-base: ubuntu@26.04
 platforms:
-    amd64:
-    arm64:
+  amd64:
+  arm64:
 
 environment:
-    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/16/bin"
-    PGDATA: /var/lib/postgresql/data
-    TZ: UTC
+  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/18/bin
 
+  # Include major PostgreSQL version in data directory path to enable future in-place major version
+  # upgrades with `pg_upgrade`
+  PGDATA: /var/lib/postgresql/18/
+
+  PGUSER: postgres
+
+run-user: _daemon_
 services:
-    postgres:
-        override: replace
-        command: /usr/local/bin/entrypoint.sh postgres
-        startup: enabled
-        user: postgres
-        group: postgres
+  initdb:
+    override: replace
+    # `--username` can be overridden if user specifies `--username` again with `--args initdb`.
+    # (e.g. `--args initdb --username=foo`). Same with `--auth` and `--pwfile`.
+    # If duplicate arguments are given, `initdb` will use the last value.
+    #
+    # The locale arguments are more complicated—usually multiple arguments need to be specified and
+    # the arguments are not isolated from each other.
+    # For example, if `--locale-provider` is not explicitly set to `builtin` or `icu`, `--locale`
+    # sets the database locale. If `--locale-provider` is set to `builtin` or `icu`, `--locale`
+    # does not set the database locale and only sets the locale used for LC_MESSAGES, LC_MONETARY,
+    # LC_NUMERIC, and LC_TIME. See "Locale information" comment below for more information.
+    # Since `--locale-provider` defaults to libc (upstream), a user that specifies
+    # `--args initdb --locale en_US.UTF-8` would expect the database locale to be set to
+    # en_US.UTF-8. (In other words, a user that specifies `--locale` would not expect
+    # `--locale-provider` to be set if they did not specify it themselves.)
+    # Therefore, include all locale-related arguments in `[ ]` so that if the user specifies any
+    # `initdb` args with `--args initdb`, this rock does not set any locale-related arguments.
+    # (This rock will only automatically set the locale provider to builtin [overriding the
+    # upstream default of libc] if the user does not specify `--args initdb`.)
+    #
+    # Pass `initdb` superuser password via file (/run/secrets/postgres_password) instead of
+    # environment variable since it is more secure:
+    # https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html#51-injection-of-secrets-file-in-memory
+    # Password file is in /run/secrets for convenience for Docker users:
+    # https://docs.docker.com/compose/how-tos/use-secrets/
+    command: /usr/libexec/postgresql-rock/18/._initdb_if_needed.sh --username=postgres --auth=scram-sha-256 --pwfile=/run/secrets/postgres_password --no-instructions [ --locale-provider=builtin --builtin-locale=PG_UNICODE_FAST --locale=C.UTF-8 ]
+    startup: enabled
+    on-success: ignore
+    on-failure: shutdown
 
+  postgres:
+    override: replace
+    # `listen_addresses` information
+    # We expect most users to connect to the PostgreSQL server in this rock from an IP address that
+    # is different from the deployed rock's IP address (e.g. from a different Kubernetes Pod).
+    # Therefore, set `listen_addresses` to `*` by default.
+    # If the user is only connecting to the PostgreSQL server from a sidecar container, they can
+    # override this with `--args postgres`.
+    command: /usr/lib/postgresql/18/bin/postgres [ -c listen_addresses='*' ]
+    startup: enabled
+    requires:
+      - initdb
+    # Match Ubuntu deb package behavior (1 hour timeout for graceful stop before SIGKILL):
+    # https://git.launchpad.net/ubuntu/+source/postgresql-common/tree/systemd/system/postgresql@.service?h=applied/ubuntu/resolute&id=52956dc6ddb8b421b28f58377fd113415fd00f9c#n23
+    kill-delay: 1h
+    # If https://github.com/canonical/pebble/issues/719 is resolved, this rock should configure
+    # pebble to send SIGINT instead of SIGTERM to use PostgreSQL's fast shutdown mode.
+    # https://www.postgresql.org/docs/current/server-shutdown.html
+    # Fast shutdown mode aborts existing connections instead of waiting for them to close on their
+    # own. The default behavior of `pg_ctl stop` is to use fast shutdown mode:
+    # https://www.postgresql.org/docs/current/app-pg-ctl.html
+    # The Ubuntu deb package also uses fast shutdown mode:
+    # https://git.launchpad.net/ubuntu/+source/postgresql-common/tree/systemd/system/postgresql@.service?h=applied/ubuntu/resolute&id=52956dc6ddb8b421b28f58377fd113415fd00f9c#n22
+    # However, pebble sends SIGTERM to the entire process group (unlike systemd's ExecStop, which
+    # would only signal the postmaster).
+    # Documentation about pebble signaling the entire process group:
+    # https://ubuntu.com/docs/pebble/reference/cli-commands/#stop
+    # Because PostgreSQL implements fast shutdown mode by having the postmaster send SIGTERM to all
+    # server processes, pebble's behavior happens to achieve a similar effect to PostgreSQL's fast
+    # shutdown mode, despite it being a smart shutdown from the postmaster's perspective.
+
+# Locale information
+#
+# For the majority of users, we recommend using PostgreSQL's built-in PG_UNICODE_FAST locale as the
+# database locale. Where locale-aware sorting is desired, we recommend using ICU locales
+# (collations) for that specific column or query.
+# Using PostgreSQL's built-in locale provider instead of the default libc provider prevents silent
+# corruption of primary keys and other indexes (which can cause data loss) on glibc updates. More
+# information:
+# - https://www.postgresql.org/message-id/flat/e4ac16908dad3eddd3ed73c4862591375a3f0539.camel%40j-davis.com
+# - https://www.youtube.com/watch?v=KTA6oau7tl8
+# - https://wiki.postgresql.org/wiki/Locale_data_changes
+# - https://www.postgresql.org/message-id/flat/BA6132ED-1F6B-4A0B-AC22-81278F5AB81E%40tripadvisor.com
+# - https://www.postgresql.org/message-id/flat/CB4D1C6BAA80CF146CB0D4F2%40eje.credativ.lan
+#
+# Of the available built-in locales (C, C.UTF-8, PG_UNICODE_FAST), we recommend PG_UNICODE_FAST.
+# While sorting (LC_COLLATE) is the most important aspect of the locale (since changes to sort
+# order can corrupt indexes), the locale is also used for LC_CTYPE, which includes character
+# classification (e.g. which characters are considered letters) and case conversion (e.g. lowercase
+# to uppercase).
+# - The built-in C locale only classifies ASCII characters correctly
+# - The built-in C.UTF-8 locale does not implement full Unicode case mapping
+#   (https://www.unicode.org/versions/latest/core-spec/chapter-3/#G34000) and does not classify all
+#   Unicode decimal digits as digits in regular expressions, among other things
+# - The built-in PG_UNICODE_FAST locale uses full Unicode case mapping (e.g.
+#   `upper('ß')` -> `'SS'`) and standard Unicode regular expression character classes
+#
+# If this rock is started with an empty (uninitialized) data directory and if the user does not
+# specify `--args initdb`, it sets the default database locale to PG_UNICODE_FAST.
+# Specifically, this rock passes
+# `--locale-provider=builtin --builtin-locale=PG_UNICODE_FAST --locale=C.UTF-8` to `initdb`.
+#
+# Even when the `--locale-provider` is set to `builtin` or `icu`, libc is used for:
+# - LC_MESSAGES: Language in which messages are displayed
+# - LC_MONETARY: Formatting of monetary amounts
+# - LC_NUMERIC: Formatting of numbers
+# - LC_TIME: Formatting of dates and times
+# When `--locale-provider` is set to `builtin` or `icu`, the `--locale` argument to `initdb` sets
+# the default libc locale for these behaviors. If `--locale` were not specified, it would default
+# to glibc's C locale. This rock, in the conditions described above, sets `--locale` to C.UTF-8
+# instead of the default C because of things such as
+# https://github.com/postgres/postgres/commit/e113f9c102b7e2462facf0ecffc97f8093efed54.
+# (That commit fixes full text search to use the database's locale instead of always using libc.
+# However, that patch only landed in PostgreSQL 19.
+# For example (with PostgreSQL 18):
+# SELECT to_tsvector('simple', 'a½b');
+# Result with `--locale=C`: `'a½b':1` (½ counted as a letter)
+# Result with `--locale=C.UTF-8`: `'a':1 'b':2` (½ correctly rejected)
+# )
+# While glibc's C.UTF-8 does not behave identically to the built-in PG_UNICODE_FAST (obviously, or
+# the built-in locale provider would not exist), it behaves closer to the built-in PG_UNICODE_FAST
+# than glibc's C locale.
+# An example where glibc's C.UTF-8 does not behave identically to the built-in PG_UNICODE_FAST:
+# SELECT to_tsvector('english', '٣running');  -- (٣ is U+0663 ARABIC-INDIC DIGIT THREE)
+# Result with PostgreSQL 18: `'٣run':1`
+# Result with PostgreSQL 19: `'٣running':1`
+# (glibc's C.UTF-8 classifies ٣ as an alphabetic character instead of as a digit, so '٣running' is
+# parsed as a word and the english_stem dictionary is used. When ٣ is correctly recognized as a
+# digit on PostgreSQL 19 (with PG_UNICODE_FAST), '٣running' is parsed as a numword and the simple
+# dictionary is used.)
+# Note: glibc's C.UTF-8 locale behaves differently than the built-in C.UTF-8 locale.
+#
+# When locale-aware sorting is desired, we recommend using ICU locales (collations) for that
+# specific column or query: https://www.postgresql.org/docs/current/collation.html
+# The reason we recommend ICU locales instead of glibc locales is because ICU collations are
+# versioned.
+# (https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADMIN-COLLATION)
+#
+# In order to support the locale approach we recommend for the majority of users, this rock needs
+# to include:
+# - the built-in locale provider (included in PostgreSQL itself)
+# - the ICU locales (which are already included as a dependency of the `postgresql` deb package)
+# - the glibc locales, which this rock includes by installing the `locales-all` package
+# The glibc locales are needed for LC_MESSAGES (for non-English speakers), LC_MONETARY, LC_NUMERIC,
+# and LC_TIME, as described above. We do not recommend using the glibc locales for the database
+# locale or as a collation for specific columns or queries. However, because they are included in
+# this rock, it is possible for users to use the glibc locales as the database locale or as a
+# collation for specific columns or queries. (And we need to maintain backwards compatibility for
+# those use cases in the future.)
+
+adopt-info: rock-version
 parts:
-    pre-postgres:
-        plugin: nil
-        overlay-script: |
-            craftctl default
-            # Create a user in the $CRAFT_OVERLAY chroot
-            groupadd -R $CRAFT_OVERLAY -g 584788 postgres
-            useradd -R $CRAFT_OVERLAY --create-home -r -g postgres -u 584788 postgres
-    postgres:
-        plugin: nil
-        after:
-            - pre-postgres
-        overlay-packages:
-            - coreutils
-            # set PG pager for psql to less
-            - less
-            - locales-all
-            - postgresql
-            - postgresql-16
-            - postgresql-common
-            - postgresql-client-16
-            - postgresql-client-common
-            - tzdata
-            - util-linux
-        overlay-script: |
-            craftctl default
-            mkdir -p $CRAFT_OVERLAY/licenses
-            mv $CRAFT_OVERLAY/usr/share/doc/coreutils/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-coreutils
-            mv $CRAFT_OVERLAY/usr/share/doc/less/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-less
-            mv $CRAFT_OVERLAY/usr/share/doc/locales-all/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-locales-all
-            mv $CRAFT_OVERLAY/usr/share/doc/postgresql/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-postgresql
-            mv $CRAFT_OVERLAY/usr/share/doc/postgresql-16/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-postgresql-16
-            mv $CRAFT_OVERLAY/usr/share/doc/postgresql-common/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-postgresql-common
-            mv $CRAFT_OVERLAY/usr/share/doc/postgresql-client-16/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-postgresql-client-16
-            mv $CRAFT_OVERLAY/usr/share/doc/postgresql-client-common/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-postgresql-client-common
-            mv $CRAFT_OVERLAY/usr/share/doc/tzdata/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-tzdata
-            mv $CRAFT_OVERLAY/usr/share/doc/util-linux/copyright $CRAFT_OVERLAY/licenses/COPYRIGHT-util-linux
-    post-postgres:
-        plugin: nil
-        after:
-            - postgres
-        overlay-script: |
-            craftctl default
-            mkdir -p $CRAFT_OVERLAY/var/lib/postgresql
-            mkdir -p $CRAFT_OVERLAY/var/run/postgresql
-            chown -R 584788 $CRAFT_OVERLAY/var/lib/postgresql
-            chown -R 584788 $CRAFT_OVERLAY/var/run/postgresql
-            # Docker entrypoint compatibility
-            mkdir -p $CRAFT_OVERLAY/docker-entrypoint-initdb.d/
-            # Allow access to PostgreSQL
-            sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" $CRAFT_OVERLAY/usr/share/postgresql/16/postgresql.conf.sample
-            # Remove the snakeoil self-signed certificate generated by the ssl-cert package
-            rm -f $CRAFT_OVERLAY/etc/ssl/certs/ssl-cert-snakeoil.pem
-            rm -f $CRAFT_OVERLAY/etc/ssl/private/ssl-cert-snakeoil.key
-            # Generate dpkg.query
-            mkdir -p $CRAFT_OVERLAY/usr/share/rocks
-            echo "# os-release" > $CRAFT_OVERLAY/usr/share/rocks/dpkg.query
-            echo "# dpkg-query" >> $CRAFT_OVERLAY/usr/share/rocks/dpkg.query
-            declare -a fields
-            fields+=('${db:Status-Abbrev}')
-            fields+=('${binary:Package}')
-            fields+=('${Version}')
-            fields+=('${source:Package}')
-            fields+=('${Source:Version}')
-            printf -v dpkg_ops '%s,' "${fields[@]}"
-            dpkg-query -W -f "${dpkg_ops}\n" --root=${CRAFT_OVERLAY} >> $CRAFT_OVERLAY/usr/share/rocks/dpkg.query
-    rock-entrypoint:
-        plugin: dump
-        source: .
-        source-type: local
-        stage:
-            - usr/local/bin/
-        organize:
-            scripts/entrypoint.sh: /usr/local/bin/entrypoint.sh
-    rock-license:
-        plugin: dump
-        source: .
-        source-type: local
-        stage:
-            - licenses/LICENSE-rock
-        organize:
-            LICENSE: licenses/LICENSE-rock
+  # Workaround for https://github.com/canonical/craft-parts/issues/1751
+  # Ensure `locales` deb package is never staged
+  workaround-stage-packages-nondeterminism:
+    plugin: nil
+    override-pull: |
+      craftctl default
+
+      mkdir -p /etc/apt/preferences.d
+      cat > /etc/apt/preferences.d/no-locales-package << 'EOF'
+      Package: locales
+      Pin: version *
+      Pin-Priority: -1
+      EOF
+
+  postgresql:
+    after:
+      - workaround-stage-packages-nondeterminism
+    plugin: nil
+    # `stage-packages` sets `Apt::Install-Recommends` to False:
+    # https://github.com/canonical/craft-parts/blob/f75d994eeef47be7c1bec0a6ce4fa644e1e7dca8/craft_parts/packages/deb.py#L906
+    # https://github.com/canonical/craft-parts/blob/f75d994eeef47be7c1bec0a6ce4fa644e1e7dca8/craft_parts/packages/apt_cache.py#L120-L121
+    # `stage-packages` does not install packages and thus does not run Debian package maintainer
+    # scripts:
+    # https://forum.snapcraft.io/t/stage-packages-not-running-post-installation-script/32722/3
+    stage-packages:
+      # For /lib/ -> /usr/lib/ symlink (needed by pebble)
+      - base-files
+
+      # `initdb` requires a shell:
+      # https://github.com/postgres/postgres/blob/c5666f7e16ca6845dac21b46bb2704038b35dad7/src/common/exec.c#L360
+      # https://pubs.opengroup.org/onlinepubs/9699919799/functions/popen.html
+      - dash
+
+      # `psql` pager: https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-META-COMMAND-PSET-PAGER
+      # If `less` is installed, it is used as the default `psql` pager. Upstream PostgreSQL uses
+      # `more` as the default pager for non-Cygwin builds, but the Debian package applies a patch
+      # that replaces `more` with `pager` (uses Debian alternatives system).
+      # `stage-packages` does not run Debian package maintainer scripts, which (among other things)
+      # are responsible for the alternatives system and creating the symlink from /usr/bin/pager to
+      # /etc/alternatives/pager (which would be a symlink to /usr/bin/less).
+      # Therefore, this rock creates the symlink from /usr/bin/pager in this part's
+      # `override-prime`.
+      - less
+
+      # Needed by `less` to behave as expected:
+      # https://lists.gnu.org/archive/html/help-gnu-utils/2004-08/msg00030.html
+      - ncurses-base
+
+      # See "Locale information" comment above
+      # Ensure `locales-all` deb package is resolved together with `postgresql` deb package (i.e.
+      # in the same part's `stage-packages`).
+      # The `postgresql` deb package depends on `locales | locales-all`. Avoid staging `locales`
+      # unnecessarily since this rock needs `locales-all`.
+      # As of https://github.com/canonical/craft-parts/pull/1752, packages in the same part's
+      # `stage-packages` will be resolved in order. Therefore, put `locales-all` before
+      # `postgresql`.
+      - locales-all
+      # `libc-bin` provides glibc's C.UTF-8 locale
+      # `locales-all` also contains symlinks to glibc's C.UTF-8 locale, so `libc-bin` is needed for
+      # glibc locales beyond just C.UTF-8
+      - libc-bin
+
+      - postgresql
+      - postgresql-18-jit  # TODO remove on riscv/non-supported arch
+      - postgresql-pltcl-18
+      - postgresql-plperl-18
+      - postgresql-plpython3-18
+    override-prime: |
+      craftctl default
+
+      # Remove pg_wrapper symlinks (to prevent postgresql-common wrappers from overriding upstream binaries)
+      find "${CRAFT_PRIME}/usr/bin" -maxdepth 1 -type l -lname '*pg_wrapper' -delete
+
+      # `stage-packages` does not run Debian package maintainer scripts that would usually manage
+      # the Debian alternatives system
+      ln --symbolic /usr/bin/less "${CRAFT_PRIME}/usr/bin/pager"
+
+      # `stage-packages` does not run `base-files`'s Debian package maintainer scripts that would
+      # usually create these symlinks
+      rmdir "${CRAFT_PRIME}/var/run" "${CRAFT_PRIME}/var/lock"
+      ln --symbolic /run "${CRAFT_PRIME}/var/run"
+      ln --symbolic /run/lock "${CRAFT_PRIME}/var/lock"
+
+      install --directory --owner 584792 --group 584792 "${CRAFT_PRIME}/var/lib/postgresql" "${CRAFT_PRIME}/run/postgresql"
+
+  initdb-wrapper:
+    plugin: dump
+    source: .
+    organize:
+      ._initdb_if_needed.sh: usr/libexec/postgresql-rock/18/._initdb_if_needed.sh
+    stage:
+      - usr/libexec/postgresql-rock/18/._initdb_if_needed.sh
+    permissions:
+      - mode: '755'
+
+  # Set rock version with `adopt-info`
+  # (https://ubuntu.com/docs/snapcraft/latest/how-to/crafting/configure-package-information/#with-a-script)
+  rock-version:
+    after:
+      - postgresql
+    plugin: nil
+    override-stage: |
+      # Get path to `postgres` binary for highest major PostgreSQL version
+      postgres_bin="$(ls "${CRAFT_STAGE}"/usr/lib/postgresql/*/bin/postgres | sort --version-sort | tail --lines 1)"
+
+      # Example value: "postgres (PostgreSQL) 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1)"
+      postgres_version="$(chroot "${CRAFT_STAGE}" "${postgres_bin#"${CRAFT_STAGE}"}" --version)"
+
+      craftctl set version="$(sed --quiet --regexp-extended --expression 's/postgres \(PostgreSQL\) ([^ ]+).*/\1/p' <<< "${postgres_version}")"
+
+  # https://github.com/canonical/oci-factory/blob/main/IMAGE_MAINTAINER_AGREEMENT.md#enable-security-monitoring
+  deb-security-manifest: # TODO
+    after:
+      - postgresql
+    plugin: nil
+    override-prime: |
+      craftctl default
+
+      mkdir -p "${CRAFT_PRIME}/usr/share/rocks/"
+      manifest_path="${CRAFT_PRIME}/usr/share/rocks/dpkg.query"
+      echo '# os-release' > "${manifest_path}"
+      cat /etc/os-release >> "${manifest_path}"
+      echo '# dpkg-query' >> "${manifest_path}"
+      dpkg-query --admindir="${CRAFT_PRIME}/var/lib/dpkg/" --showformat '${db:Status-Abbrev},${binary:Package},${Version},${source:Package},${Source:Version}\n' --show >> "${manifest_path}"
