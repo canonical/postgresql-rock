@@ -4,20 +4,20 @@ execute: |
   echo "Running smoke test..."
 
   echo "Connecting DB..."
-  PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();"
+  PGPASSWORD=9pPS9xqlRFdO3ZCStqsjf5Z5 psql -h 127.0.0.1 -U postgres -c "select now();"
 
   echo "Connection DB with wrong credentials..."
-  PGPASSWORD=wrongpassord psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();" && exit 1 || true # failure expected
+  PGPASSWORD=wrongpassord psql -h 127.0.0.1 -U postgres -c "select now();" && exit 1 || true # failure expected
 
   echo "Checking Pebble UI..."
   docker exec -t "${SPREAD_TASK//\//_}" pebble stop postgres
-  PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();" && exit 1 || true # failure expected
+  PGPASSWORD=9pPS9xqlRFdO3ZCStqsjf5Z5 psql -h 127.0.0.1 -U postgres -c "select now();" && exit 1 || true # failure expected
 
   docker exec -t "${SPREAD_TASK//\//_}" pebble start postgres
-  PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();"
+  PGPASSWORD=9pPS9xqlRFdO3ZCStqsjf5Z5 psql -h 127.0.0.1 -U postgres -c "select now();"
 
   docker exec -t "${SPREAD_TASK//\//_}" pebble restart postgres
-  PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres -c "select now();"
+  PGPASSWORD=9pPS9xqlRFdO3ZCStqsjf5Z5 psql -h 127.0.0.1 -U postgres -c "select now();"
 
   docker exec -t "${SPREAD_TASK//\//_}" pebble logs
   docker exec -t "${SPREAD_TASK//\//_}" pebble services
