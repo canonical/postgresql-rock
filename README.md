@@ -144,7 +144,7 @@ rockcraft pack
 
 ### Running the rock
 ```bash
-sudo rockcraft.skopeo --insecure-policy copy oci-archive:postgres_*.rock docker-daemon:${USER}/postgres:latest
+sudo rockcraft.skopeo --insecure-policy copy oci-archive:postgres_18.6_amd64.rock docker-daemon:${USER}/postgres:latest
 docker run --rm -it -p 5432:5432 --name mypostgres --volume mypgdata:/var/lib/postgresql/ --mount type=bind,source="$PWD/postgres_password.txt",destination=/run/secrets/postgres_password,readonly -d ${USER}/postgres:latest
 ```
 
