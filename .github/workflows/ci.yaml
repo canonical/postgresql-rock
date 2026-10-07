@@ -3,7 +3,7 @@
 name: Rock Build/Tests
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-1
   cancel-in-progress: true
 
 on:
@@ -38,8 +38,8 @@ jobs:
       fail-fast: false
       matrix:
         runner:
-          - ubuntu-26.04
-          - ubuntu-26.04-arm
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
     needs:
       - lint-workflows
     steps:
