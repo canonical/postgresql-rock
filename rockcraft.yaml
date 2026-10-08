@@ -305,6 +305,6 @@ parts:
 
       # `dpkg-query` does not work for `stage-packages` because `stage-packages` are not installed
       # Derived from https://github.com/canonical/rocks-security-manifest/blob/ce51faf09ef40b451c207f8d43307011095b06e7/gen_manifest#L18-L22
-      for deb in "${CRAFT_PROJECT_DIR}"/../parts/*/stage_packages/*.deb; do
+      for deb in /root/parts/*/stage_packages/*.deb; do
         printf 'ii ,%s\n' "$(dpkg-deb --show --showformat='${binary:Package},${Version},${source:Package},${Source:Version}' "${deb}")"
       done | sort --unique >> "${manifest_path}"
