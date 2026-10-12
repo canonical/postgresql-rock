@@ -1,6 +1,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-name: Rock Build/Tests
+name: Tests
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -10,10 +10,6 @@ on:
   pull_request:
   # Triggered on push by .github/workflows/release.yaml
   workflow_call:
-    outputs:
-      artifact-prefix:
-        description: build_rock.yaml `artifact-prefix` output
-        value: ${{ jobs.build.outputs.artifact-prefix }}
 
 jobs:
   lint-workflows:
@@ -23,33 +19,24 @@ jobs:
       contents: read
     cache-mode: none
 
-  build:
-    name: Build rock
-    uses: canonical/data-platform-workflows/.github/workflows/build_rock.yaml@v53.0.0
-    permissions:
-      contents: read
-    cache-mode: none
-
   test:
-    name: Test rock | ${{ matrix.runner }}
-    timeout-minutes: 10
-    runs-on: ${{ matrix.runner }}
     strategy:
-      fail-fast: false
       matrix:
         runner:
           - ubuntu-24.04
           - ubuntu-24.04-arm
+    name: Test rock | ${{ matrix.runner }}
     needs:
       - lint-workflows
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Run tests
+      - name: Set up environment
         run: |
-          # lxd is necessary for spread
           sudo snap install lxd
           sudo adduser "$USER" lxd
           # `newgrp` does not work in GitHub Actions; use `sudo --user` instead
@@ -60,6 +47,7 @@ jobs:
           sudo iptables -P FORWARD ACCEPT
 
           sudo snap install rockcraft --classic
-          sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- rockcraft test
+      - name: rockcraft test
+        run: sudo --user "$USER" --preserve-env --preserve-env=PATH -- env -- rockcraft test -v
     permissions: {}
     cache-mode: none
