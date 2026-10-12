@@ -1,0 +1,8 @@
+summary: PostgreSQL rock smoke tests
+
+execute: |
+  echo "Running versions test..."
+
+  ROCK_VERSION="$(awk '/^version: /{gsub(/'"'"'/, "", $2); print $2;exit}' "${SPREAD_PATH}"/rockcraft.yaml)"
+  PGPASSWORD=9pPS9xqlRFdO3ZCStqsjf5Z5 psql -h 127.0.0.1 -U postgres -c "select version();" | MATCH "PostgreSQL ${ROCK_VERSION}"
+
