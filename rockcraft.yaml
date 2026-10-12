@@ -177,7 +177,8 @@ services:
 # collation for specific columns or queries. (And we need to maintain backwards compatibility for
 # those use cases in the future.)
 
-adopt-info: rock-version
+#adopt-info: rock-version
+version: '18.6'  # TODO: replace with adopt-info when OCI Factory supports it
 parts:
   # Workaround for https://github.com/canonical/craft-parts/issues/1751
   # Ensure `locales` deb package is never staged
@@ -276,18 +277,18 @@ parts:
 
   # Set rock version with `adopt-info`
   # (https://ubuntu.com/docs/snapcraft/latest/how-to/crafting/configure-package-information/#with-a-script)
-  rock-version:
-    after:
-      - postgresql
-    plugin: nil
-    override-stage: |
-      # Get path to `postgres` binary for highest major PostgreSQL version
-      postgres_bin="$(ls "${CRAFT_STAGE}"/usr/lib/postgresql/*/bin/postgres | sort --version-sort | tail --lines 1)"
-
-      # Example value: "postgres (PostgreSQL) 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1)"
-      postgres_version="$(chroot "${CRAFT_STAGE}" "${postgres_bin#"${CRAFT_STAGE}"}" --version)"
-
-      craftctl set version="$(sed --quiet --regexp-extended --expression 's/postgres \(PostgreSQL\) ([^ ]+).*/\1/p' <<< "${postgres_version}")"
+#  rock-version:
+#    after:
+#      - postgresql
+#    plugin: nil
+#    override-stage: |
+#      # Get path to `postgres` binary for highest major PostgreSQL version
+#      postgres_bin="$(ls "${CRAFT_STAGE}"/usr/lib/postgresql/*/bin/postgres | sort --version-sort | tail --lines 1)"
+#
+#      # Example value: "postgres (PostgreSQL) 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1)"
+#      postgres_version="$(chroot "${CRAFT_STAGE}" "${postgres_bin#"${CRAFT_STAGE}"}" --version)"
+#
+#      craftctl set version="$(sed --quiet --regexp-extended --expression 's/postgres \(PostgreSQL\) ([^ ]+).*/\1/p' <<< "${postgres_version}")"
 
   # https://github.com/canonical/oci-factory/blob/main/IMAGE_MAINTAINER_AGREEMENT.md#enable-security-monitoring
   deb-security-manifest:
