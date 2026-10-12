@@ -9,26 +9,35 @@ For more information on rocks, visit the [rockcraft repository][repo-rockcraft].
 
 As simple as pull, run, connect. Pull:
 ```bash
-docker pull ubuntu/postgres:16-24.04_edge
+docker pull ubuntu/postgres:18-26.04_edge
 ```
 
 Start a new container:
 ```bash
-docker run -it -d \
-    -e POSTGRES_PASSWORD=myS3cr3tp@ss \
+# Generate password
+tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24 | tee postgres_password.txt
+sudo chown 584792:584792 postgres_password.txt
+sudo chmod 400 postgres_password.txt
+
+docker run -d \
     --name mypostgres \
-    -p 3432:5432 \
-    --volume pg-data:/var/lib/postgresql/ \
-    ubuntu/postgres:16-24.04_edge
+    -p 5432:5432 \
+    --volume mypgdata:/var/lib/postgresql/ \
+    --mount type=bind,source="$PWD/postgres_password.txt",destination=/run/secrets/postgres_password,readonly \
+    ubuntu/postgres:18-26.04_edge
+    
+# (Optional) Allow remote users to log in
+# See https://www.postgresql.org/docs/current/auth-pg-hba-conf.html for more information
+# Consider restricting to specific IP addresses instead of allowing all IP addresses
+docker exec mypostgres sh -c 'echo "host all all all scram-sha-256" >> "$PGDATA/pg_hba.conf"'
+docker restart mypostgres
 ```
 
 Connect using psql from the container:
 ```bash
-docker exec -it \
-    -e PGPASSWORD=myS3cr3tp@ss \
-    mypostgres psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+docker exec -it mypostgres psql
 
-> psql (16.13 (Ubuntu 16.13-0ubuntu0.24.04.1))
+> psql (18.6 (Ubuntu 18.6-0ubuntu0.26.04.1))
 > Type "help" for help.
 >
 > postgres=#
@@ -36,10 +45,10 @@ docker exec -it \
 
 Connect using local psql (if available):
 ```bash
-sudo apt install -y postgresql-client-*
-PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres
+sudo apt install -y postgresql-client
+psql -h 127.0.0.1 --user postgres
 
-> psql (16.13 (Ubuntu 16.13-0ubuntu0.24.04.1))
+> psql (18.6 (Ubuntu 18.6-0ubuntu0.26.04.1))
 > Type "help" for help.
 >
 > postgres=#
@@ -52,15 +61,15 @@ To stop/start running rock, use common actions:
 docker ps
 
 > CONTAINER ID   IMAGE                           COMMAND                  CREATED         STATUS          PORTS                                         NAMES
-> f935801018a2   ubuntu/postgres:16-24.04_edge   "/usr/bin/pebble ent…"   4 minutes ago   Up 40 seconds   0.0.0.0:3432->5432/tcp, [::]:3432->5432/tcp   mypostgres
+> f935801018a2   ubuntu/postgres:18-26.04_edge   "/usr/bin/pebble ent…"   4 minutes ago   Up 40 seconds   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   mypostgres
 
 docker stop mypostgres
 
 docker start mypostgres
 
-docker exec -it -e PGPASSWORD=myS3cr3tp@ss mypostgres psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+docker exec -it mypostgres psql
 
-> psql (16.13 (Ubuntu 16.13-0ubuntu0.24.04.1))
+> psql (18.6 (Ubuntu 18.6-0ubuntu0.26.04.1))
 > Type "help" for help.
 >
 > postgres=#
@@ -72,10 +81,10 @@ To delete the running rock (note: ensure data stored in persistent volume!):
 ```bash
 docker ps --format "table {{.Names}}\t{{.Mounts}}"
 > NAMES        MOUNTS
-> some_pg                <<< DB stored inside container (will be removed with container)
-> mypostgres   pg-data   <<< DB stored on percistent volume (survives container removal)
+> some_pg                 <<< DB stored inside container (will be removed with container)
+> mypostgres   mypgdata   <<< DB stored on percistent volume (survives container removal)
 
-docker volume inspect pg-data
+docker volume inspect mypgdata
 
 docker stop mypostgres
 docker rm mypostgres
@@ -84,12 +93,12 @@ docker rm mypostgres
 ### PostgreSQL configuration
 Start PostgreSQL with non-default configurations (during the initial docker run):
 ```bash
-docker run -it -d \
-    -e POSTGRES_PASSWORD=myS3cr3tp@ss \
-    -p 3432:5432 \
+docker run -d \
+    -p 5432:5432 \
     --name mypostgres \
-    --volume pg-data:/var/lib/postgresql/ \
-    ubuntu/postgres:16-24.04_edge \
+    --volume mypgdata:/var/lib/postgresql/ \
+    --mount type=bind,source="$PWD/postgres_password.txt",destination=/run/secrets/postgres_password,readonly \
+    ubuntu/postgres:18-26.04_edge \
         --args postgres \
             -c max_connections=242 \
             -c fsync=off \
@@ -97,9 +106,7 @@ docker run -it -d \
             -c shared_buffers=256MB
 
 
-docker exec -it -e PGPASSWORD=myS3cr3tp@ss mypostgres \
-    psql -h 127.0.0.1 -p 5432 -U postgres -d postgres \
-        -c 'show max_connections;'
+docker exec -it mypostgres psql -c 'show max_connections;'
 
  max_connections
 -----------------
@@ -137,21 +144,20 @@ rockcraft pack
 
 ### Running the rock
 ```bash
-VERSION=$(awk '/^version: /{gsub(/'"'"'/, "", $2); print $2;exit}' rockcraft.yaml)
-sudo rockcraft.skopeo --insecure-policy copy oci-archive:postgres_${VERSION}_amd64.rock docker-daemon:${USER}/postgres:${VERSION}
-docker run --rm -it -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name mypostgres --volume pg-data:/var/lib/postgresql/ -d ${USER}/postgres:${VERSION}
+sudo rockcraft.skopeo --insecure-policy copy oci-archive:postgres_18.6_amd64.rock docker-daemon:${USER}/postgres:latest
+docker run --rm -it -p 5432:5432 --name mypostgres --volume mypgdata:/var/lib/postgresql/ --mount type=bind,source="$PWD/postgres_password.txt",destination=/run/secrets/postgres_password,readonly -d ${USER}/postgres:latest
 ```
 
 ### Connecting to PostgreSQL
 From inside the container:
 ```bash
-docker exec -it -e PGPASSWORD=myS3cr3tp@ss mypostgres psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
+docker exec -it mypostgres psql
 ```
 
 From outside the container:
 ```bash
-sudo apt install -y postgresql-client-*
-PGPASSWORD=myS3cr3tp@ss psql -h 127.0.0.1 -p 3432 -U postgres -d postgres
+sudo apt install -y postgresql-client
+psql -h 127.0.0.1 --user postgres
 ```
 
 ## Troubleshooting:

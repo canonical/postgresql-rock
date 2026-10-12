@@ -23,10 +23,16 @@ suites:
       rockcraft.skopeo --insecure-policy copy "oci-archive:$CRAFT_ARTIFACT" docker-daemon:postgres:spreadtest
 
       # Install postgresql client (psql)
-      apt install -y postgresql-client-*
+      apt install -y postgresql-client
     prepare-each: |
-      docker run -d --rm -e POSTGRES_PASSWORD=myS3cr3tp@ss -p 3432:5432 --name "${SPREAD_TASK//\//_}" postgres:spreadtest
+      echo '9pPS9xqlRFdO3ZCStqsjf5Z5' > postgres_password.txt
+      chown 584792:584792 postgres_password.txt
+      chmod 400 postgres_password.txt
+      docker run -d --rm -p 5432:5432 --mount type=bind,source="$PWD/postgres_password.txt",destination=/run/secrets/postgres_password,readonly --name "${SPREAD_TASK//\//_}" postgres:spreadtest
       sleep 5 # Wait for pebble to bootstrap and launch Postgres
+      docker exec "${SPREAD_TASK//\//_}" sh -c 'echo "host all all all scram-sha-256" >> "$PGDATA/pg_hba.conf"'
+      docker restart "${SPREAD_TASK//\//_}"
+      sleep 3
     restore-each: |
       docker kill "${SPREAD_TASK//\//_}" || true
     restore: |
