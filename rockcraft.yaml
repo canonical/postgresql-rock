@@ -111,6 +111,7 @@ services:
 # - https://wiki.postgresql.org/wiki/Locale_data_changes
 # - https://www.postgresql.org/message-id/flat/BA6132ED-1F6B-4A0B-AC22-81278F5AB81E%40tripadvisor.com
 # - https://www.postgresql.org/message-id/flat/CB4D1C6BAA80CF146CB0D4F2%40eje.credativ.lan
+# - https://discourse.ubuntu.com/t/postgresql-locales-avoid-data-loss/89284
 #
 # Of the available built-in locales (C, C.UTF-8, PG_UNICODE_FAST), we recommend PG_UNICODE_FAST.
 # While sorting (LC_COLLATE) is the most important aspect of the locale (since changes to sort
@@ -178,7 +179,8 @@ services:
 # those use cases in the future.)
 
 #adopt-info: rock-version
-version: '18.6'  # TODO: replace with adopt-info when OCI Factory supports it
+# TODO: replace with adopt-info when OCI Factory supports it: https://github.com/canonical/oci-factory/issues/1273
+version: '18.6'
 parts:
   # Workaround for https://github.com/canonical/craft-parts/issues/1751
   # Ensure `locales` deb package is never staged
