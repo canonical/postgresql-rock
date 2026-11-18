@@ -60,8 +60,9 @@ services:
     # Pass `initdb` superuser password via file (/run/secrets/postgres_password) instead of
     # environment variable since it is more secure:
     # https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html#51-injection-of-secrets-file-in-memory
-    # Password file is in /run/secrets for convenience for Docker users:
+    # Password file is in /run/secrets for convenience for Docker & Podman users:
     # https://docs.docker.com/compose/how-tos/use-secrets/
+    # https://docs.podman.io/en/latest/markdown/podman-run.1.html#secret-secret-opt-opt
     command: /usr/libexec/postgresql-rock/18/._initdb_if_needed.sh --username=postgres --auth=scram-sha-256 --pwfile=/run/secrets/postgres_password --no-instructions [ --locale-provider=builtin --builtin-locale=PG_UNICODE_FAST --locale=C.UTF-8 ]
     startup: enabled
     on-success: ignore
